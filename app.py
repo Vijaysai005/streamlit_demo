@@ -52,18 +52,29 @@ data["Gross Margin %"] = ((data["Revenue"] - data["COGS"]) / data["Revenue"]) * 
 # ----------------------------------------------------
 st.sidebar.title("Reynolds CPG Toolkit")
 
+# ----------------------------------------------------
+# MODULE NAVIGATION
+# ----------------------------------------------------
+module = st.sidebar.radio("Navigation", [
+    "Data Management Portal",
+    "Power BI Dashboard",
+    "TPO Simulator",
+    "Gen AI NL Assistant"
+])
+
+
 st.sidebar.markdown("## Global Filters")
 
 selected_retailer = st.sidebar.multiselect(
-    "Retailer", retailers, default=retailers
+    "Retailer", retailers, default=[retailers[0]]
 )
 
 selected_region = st.sidebar.multiselect(
-    "Region", regions, default=regions
+    "Region", regions, default=[regions[0]]
 )
 
 selected_product = st.sidebar.multiselect(
-    "Product", products, default=products
+    "Product", products, default=[products[0]]
 )
 
 date_range = st.sidebar.date_input(
@@ -80,15 +91,6 @@ filtered_data = data[
     (data["Date"] <= pd.to_datetime(date_range[1]))
 ]
 
-# ----------------------------------------------------
-# MODULE NAVIGATION
-# ----------------------------------------------------
-module = st.sidebar.radio("Navigation", [
-    "Data Management Portal",
-    "Power BI Dashboard",
-    "TPO Simulator",
-    "Gen AI NL Assistant"
-])
 
 # ====================================================
 # MODULE 1: DATA MANAGEMENT
