@@ -3,12 +3,12 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime
 
 st.set_page_config(layout="wide")
 
 # ----------------------------------------------------
-# THEME STYLING (Reynolds Enterprise Aesthetic)
+# STYLE
 # ----------------------------------------------------
 st.markdown("""
 <style>
@@ -18,50 +18,71 @@ st.markdown("""
 [data-testid="stSidebar"] * {
     color: white;
 }
-.kpi-card {
-    background-color: white;
-    padding: 20px;
-    border-radius: 10px;
-    box-shadow: 0px 2px 8px rgba(0,0,0,0.1);
-}
 </style>
 """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# MOCK DATA
+# MOCK ENTERPRISE DATA
 # ----------------------------------------------------
 np.random.seed(42)
 
-products = ["Reynolds Wrap 200sqft", "Hefty Trash Bags 30ct", 
+products = ["Reynolds Wrap 200sqft", "Hefty Trash Bags 30ct",
             "Reynolds Plastic Wrap", "Hefty Food Containers"]
 
 retailers = ["Walmart", "Target", "Kroger"]
-business_units = ["Cooking & Baking", "Waste & Storage"]
+regions = ["North", "South", "East", "West"]
 
-dates = pd.date_range(end=datetime.today(), periods=12, freq="M")
+dates = pd.date_range("2024-01-01", periods=180)
 
-sales_data = pd.DataFrame({
-    "Month": np.tile(dates, 3),
-    "Brand": np.repeat(["Reynolds", "Competitor", "Private Label"], 12),
-    "Market Share": np.random.uniform(20, 40, 36)
+data = pd.DataFrame({
+    "Date": np.random.choice(dates, 2000),
+    "Retailer": np.random.choice(retailers, 2000),
+    "Region": np.random.choice(regions, 2000),
+    "Product": np.random.choice(products, 2000),
+    "Revenue": np.random.randint(5000, 50000, 2000),
+    "COGS": np.random.randint(3000, 30000, 2000),
+    "Trade Spend": np.random.randint(500, 5000, 2000),
+    "Volume": np.random.randint(1000, 10000, 2000)
 })
 
-shipment_data = pd.DataFrame({
-    "Month": dates,
-    "Shipments": np.random.randint(5000, 9000, 12),
-    "POS": np.random.randint(4500, 8500, 12)
-})
-
-profit_data = pd.DataFrame({
-    "SKU": products,
-    "Sales Volume": np.random.randint(10000, 50000, 4),
-    "Gross Margin %": np.random.uniform(15, 45, 4)
-})
+data["Gross Margin %"] = ((data["Revenue"] - data["COGS"]) / data["Revenue"]) * 100
 
 # ----------------------------------------------------
-# SIDEBAR NAVIGATION
+# GLOBAL FILTERS (Apply Everywhere)
 # ----------------------------------------------------
 st.sidebar.title("Reynolds CPG Toolkit")
+
+st.sidebar.markdown("## Global Filters")
+
+selected_retailer = st.sidebar.multiselect(
+    "Retailer", retailers, default=retailers
+)
+
+selected_region = st.sidebar.multiselect(
+    "Region", regions, default=regions
+)
+
+selected_product = st.sidebar.multiselect(
+    "Product", products, default=products
+)
+
+date_range = st.sidebar.date_input(
+    "Date Range",
+    [data["Date"].min(), data["Date"].max()]
+)
+
+# Apply Filters
+filtered_data = data[
+    (data["Retailer"].isin(selected_retailer)) &
+    (data["Region"].isin(selected_region)) &
+    (data["Product"].isin(selected_product)) &
+    (data["Date"] >= pd.to_datetime(date_range[0])) &
+    (data["Date"] <= pd.to_datetime(date_range[1]))
+]
+
+# ----------------------------------------------------
+# MODULE NAVIGATION
+# ----------------------------------------------------
 module = st.sidebar.radio("Navigation", [
     "Data Management Portal",
     "Power BI Dashboard",
@@ -69,36 +90,86 @@ module = st.sidebar.radio("Navigation", [
     "Gen AI NL Assistant"
 ])
 
-# ----------------------------------------------------
-# MODULE 1: DATA MANAGEMENT PORTAL
-# ----------------------------------------------------
+# ====================================================
+# MODULE 1: DATA MANAGEMENT
+# ====================================================
 if module == "Data Management Portal":
+
     st.title("Data Management Portal")
 
     st.subheader("SKU Mapping Engine")
 
     sku_map = pd.DataFrame({
-        "Retailer SKU Code": ["WM123", "TG456", "KR789"],
-        "Retailer Description": ["Foil 200sqft", "Trash Bags 30ct", "Plastic Wrap"],
-        "SAP Material Number": ["SAP001", "SAP002", ""],
+        "Retailer SKU": ["WM123", "TG456", "KR789"],
+        "Retailer": ["Walmart", "Target", "Kroger"],
+        "SAP Material": ["SAP001", "SAP002", ""],
         "Status": ["Mapped", "Mapped", "Unmapped"]
     })
 
     st.dataframe(sku_map, use_container_width=True)
 
-    st.subheader("Data Quality Scorecard")
+    # ------------------------------------------------
+    # DATA QUALITY SCORECARD (FILTERED)
+    # ------------------------------------------------
+    st.subheader("Enterprise Data Quality Scorecard")
 
-    col1, col2, col3 = st.columns(3)
+    # Simulated source splits
+    nielsen_pos = filtered_data.sample(frac=0.95, random_state=1)
+    internal_ship = filtered_data.sample(frac=1.0, random_state=2)
+    trade_planner = filtered_data.sample(frac=0.85, random_state=3)
 
-    col1.metric("Nielsen POS", "98%", "▲ 1%", delta_color="normal")
-    col2.metric("Internal Shipments", "100%", "Stable")
-    col3.metric("Trade Planner", "85%", "▼ 3%", delta_color="inverse")
+    # Freshness (based on max date proximity)
+    today = filtered_data["Date"].max()
+    freshness_score = lambda df: round(
+        100 - ((datetime.today() - df["Date"].max()).days * 2), 1
+    )
 
-# ----------------------------------------------------
+    # Completeness (null check simulation)
+    completeness_score = lambda df: round(
+        (df.notnull().mean().mean()) * 100, 1
+    )
+
+    # Accuracy (simulated variance control)
+    accuracy_score = lambda df: round(
+        100 - (np.std(df["Revenue"]) / np.mean(df["Revenue"]) * 10), 1
+    )
+
+    sources = {
+        "Nielsen POS": nielsen_pos,
+        "Internal Shipments": internal_ship,
+        "Trade Planner": trade_planner
+    }
+
+    cols = st.columns(3)
+
+    for i, (source, df_source) in enumerate(sources.items()):
+        with cols[i]:
+            fresh = freshness_score(df_source)
+            complete = completeness_score(df_source)
+            accuracy = accuracy_score(df_source)
+
+            st.markdown(f"### {source}")
+            st.metric("Freshness %", f"{fresh}%")
+            st.metric("Completeness %", f"{complete}%")
+            st.metric("Accuracy %", f"{accuracy}%")
+
+    # Overall Governance Index
+    overall_index = round(
+        np.mean([
+            freshness_score(nielsen_pos),
+            completeness_score(internal_ship),
+            accuracy_score(trade_planner)
+        ]), 1
+    )
+
+    st.markdown("---")
+    st.success(f"Overall Enterprise Data Governance Index: {overall_index}%")
+# ====================================================
 # MODULE 2: POWER BI DASHBOARD
-# ----------------------------------------------------
+# ====================================================
 elif module == "Power BI Dashboard":
-    st.title("Enterprise Analytics Dashboard")
+
+    st.title("Enterprise Analytics")
 
     page = st.tabs([
         "Enterprise KPI Scorecard",
@@ -106,124 +177,124 @@ elif module == "Power BI Dashboard":
         "SKU & Customer Profitability"
     ])
 
-    # ------------------------------------------------
-    # PAGE 1: KPI SCORECARD
-    # ------------------------------------------------
+    # PAGE 1
     with page[0]:
+
+        total_revenue = filtered_data["Revenue"].sum()
+        avg_margin = filtered_data["Gross Margin %"].mean()
+        total_volume = filtered_data["Volume"].sum()
+        total_trade = filtered_data["Trade Spend"].sum()
+
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Market Share", "32.4%", "+1.2% vs Target")
-        col2.metric("Velocity", "8.3 Units/Store/Wk", "+0.4")
-        col3.metric("Gross Margin", "28.5%", "-0.8%")
-        col4.metric("Trade ROI", "2.8x", "+0.3")
+        col1.metric("Revenue", f"${total_revenue:,.0f}")
+        col2.metric("Gross Margin %", f"{avg_margin:.1f}%")
+        col3.metric("Volume", f"{total_volume:,.0f}")
+        col4.metric("Trade Spend", f"${total_trade:,.0f}")
 
-        st.subheader("Market Share Tracker")
-
-        fig = px.line(sales_data, x="Month", y="Market Share", color="Brand")
+        trend = filtered_data.groupby("Date")["Revenue"].sum().reset_index()
+        fig = px.line(trend, x="Date", y="Revenue", title="Revenue Trend")
         st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Brand & BU Scorecard")
-        bu_table = pd.DataFrame({
-            "Business Unit": business_units,
-            "Revenue ($M)": [220, 180],
-            "Margin %": [32, 25]
-        })
-        st.dataframe(bu_table, use_container_width=True)
-
-    # ------------------------------------------------
-    # PAGE 2: SHIPMENT TO SHELF
-    # ------------------------------------------------
+    # PAGE 2
     with page[1]:
-        st.subheader("Internal Shipments vs POS")
+
+        ship_vs_pos = filtered_data.groupby("Date").agg({
+            "Revenue": "sum",
+            "Volume": "sum"
+        }).reset_index()
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=shipment_data["Month"], y=shipment_data["Shipments"], name="Shipments"))
-        fig.add_trace(go.Scatter(x=shipment_data["Month"], y=shipment_data["POS"], name="POS Consumption"))
+        fig.add_trace(go.Scatter(x=ship_vs_pos["Date"],
+                                 y=ship_vs_pos["Revenue"],
+                                 name="Shipments"))
+        fig.add_trace(go.Scatter(x=ship_vs_pos["Date"],
+                                 y=ship_vs_pos["Volume"],
+                                 name="POS Consumption"))
         st.plotly_chart(fig, use_container_width=True)
 
-        st.subheader("Inventory Health Matrix")
-
-        dos = pd.DataFrame(
-            np.random.randint(10, 60, (3, 4)),
-            index=retailers,
-            columns=products
+        heatmap_data = filtered_data.pivot_table(
+            values="Volume",
+            index="Retailer",
+            columns="Product",
+            aggfunc="sum"
         )
-        st.dataframe(dos.style.background_gradient(cmap="Blues"), use_container_width=True)
 
-        st.subheader("OOS Risk Radar")
-        st.warning("High OOS Risk: Reynolds Wrap 200sqft at Kroger (Velocity Spike + Low Inventory)")
+        st.dataframe(
+            heatmap_data.style.background_gradient(cmap="Blues"),
+            use_container_width=True
+        )
 
-    # ------------------------------------------------
-    # PAGE 3: PROFITABILITY
-    # ------------------------------------------------
+    # PAGE 3
     with page[2]:
-        st.subheader("Drivers & Draggers")
 
-        fig = px.scatter(profit_data,
-                         x="Sales Volume",
-                         y="Gross Margin %",
-                         text="SKU",
-                         size="Sales Volume",
-                         color="Gross Margin %")
+        sku_profit = filtered_data.groupby("Product").agg({
+            "Revenue": "sum",
+            "Gross Margin %": "mean",
+            "Volume": "sum"
+        }).reset_index()
+
+        fig = px.scatter(
+            sku_profit,
+            x="Volume",
+            y="Gross Margin %",
+            size="Revenue",
+            color="Product",
+            title="Drivers & Draggers"
+        )
         st.plotly_chart(fig, use_container_width=True)
-
-        st.subheader("Margin Waterfall")
 
         waterfall = go.Figure(go.Waterfall(
-            measure=["absolute", "relative", "relative", "relative", "total"],
-            x=["Gross Revenue", "COGS", "Trade Spend", "Allowances", "Net Margin"],
-            y=[100, -40, -20, -10, 0]
+            measure=["absolute", "relative", "relative", "total"],
+            x=["Revenue", "COGS", "Trade Spend", "Net"],
+            y=[100, -40, -20, 0]
         ))
         st.plotly_chart(waterfall, use_container_width=True)
 
-        st.subheader("Trade ROI Calculator")
-        roi_table = pd.DataFrame({
-            "Retailer": retailers,
-            "Spend ($)": [50000, 40000, 35000],
-            "Incremental Lift ($)": [150000, 90000, 80000],
-            "ROI": [3.0, 2.25, 2.28]
-        })
-        st.dataframe(roi_table, use_container_width=True)
-
-# ----------------------------------------------------
+# ====================================================
 # MODULE 3: TPO SIMULATOR
-# ----------------------------------------------------
+# ====================================================
 elif module == "TPO Simulator":
-    st.title("Trade Promotion Optimization Simulator")
+
+    st.title("Trade Promotion Simulator")
 
     col1, col2 = st.columns([1,2])
 
     with col1:
-        retailer = st.selectbox("Select Retailer", retailers)
-        product = st.selectbox("Select Product", products)
+        retailer = st.selectbox("Retailer", selected_retailer)
+        product = st.selectbox("Product", selected_product)
         discount = st.selectbox("Discount Type", ["TPR", "BOGO", "Feature"])
         duration = st.slider("Duration (Weeks)", 1, 8, 4)
 
     with col2:
-        baseline = {"Volume": 10000, "Revenue": 120000, "Spend": 0, "ROI": 1.0}
-        scenario1 = {"Volume": 15000, "Revenue": 180000, "Spend": 40000, "ROI": 2.5}
-        scenario2 = {"Volume": 17000, "Revenue": 200000, "Spend": 60000, "ROI": 2.2}
+        baseline = filtered_data[
+            (filtered_data["Retailer"] == retailer) &
+            (filtered_data["Product"] == product)
+        ]
 
-        comparison = pd.DataFrame([baseline, scenario1, scenario2],
-                                  index=["Baseline", "Scenario A", "Scenario B"])
-        st.dataframe(comparison, use_container_width=True)
+        base_rev = baseline["Revenue"].sum()
+        simulated_rev = base_rev * (1 + 0.25)
 
-# ----------------------------------------------------
+        comparison = pd.DataFrame({
+            "Baseline Revenue": [base_rev],
+            "Simulated Revenue (+25%)": [simulated_rev]
+        })
+
+        st.dataframe(comparison)
+
+# ====================================================
 # MODULE 4: GEN AI ASSISTANT
-# ----------------------------------------------------
+# ====================================================
 elif module == "Gen AI NL Assistant":
-    st.title("Enterprise AI Business Assistant")
 
-    col1, col2 = st.columns([2,1])
+    st.title("Enterprise AI Assistant")
 
-    with col1:
-        user_input = st.text_input("Ask a business question...")
-        if user_input:
-            st.success("Top 5 Margin Dragging SKUs at Kroger Last Month:")
-            sample = profit_data.sort_values("Gross Margin %").head(2)
-            st.dataframe(sample)
+    user_query = st.text_input("Ask a question")
 
-    with col2:
-        st.subheader("Automated Insights Feed")
-        st.info("Aluminum commodity costs rose 3%, impacting foil margins.")
-        st.info("Velocity at Target increased 5% post feature promotion.")
-        st.warning("OOS risk rising at Walmart for Trash Bags.")
+    if user_query:
+        result = filtered_data.groupby("Product")["Gross Margin %"].mean().sort_values().head(3)
+        st.write("Top Margin Draggers:")
+        st.dataframe(result.reset_index())
+
+    st.subheader("Automated Insights")
+    st.info("Foil margins declining in South region.")
+    st.warning("High trade spend at Walmart impacting ROI.")
