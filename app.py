@@ -180,29 +180,99 @@ elif module == "Power BI Dashboard":
     # PAGE 3
     with page[2]:
 
-        sku_profit = filtered_data.groupby("Product").agg({
-            "Revenue": "sum",
-            "Gross Margin %": "mean",
-            "Volume": "sum"
-        }).reset_index()
-
-        fig = px.scatter(
-            sku_profit,
-            x="Volume",
-            y="Gross Margin %",
-            size="Revenue",
-            color="Product",
-            title="Drivers & Draggers"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-
-        waterfall = go.Figure(go.Waterfall(
-            measure=["absolute", "relative", "relative", "total"],
-            x=["Revenue", "COGS", "Trade Spend", "Net"],
-            y=[100, -40, -20, 0]
-        ))
-        st.plotly_chart(waterfall, use_container_width=True)
-
+        st.subheader("SKU & Customer Profitability")
+    
+        if filtered_data.empty:
+            st.warning("No data available for selected filters.")
+        else:
+    
+            # ------------------------------------------------
+            # AGGREGATED PROFIT DATA
+            # ------------------------------------------------
+            profit_summary = filtered_data.groupby("Product").agg({
+                "Revenue": "sum",
+                "COGS": "sum",
+                "Trade Spend": "sum",
+                "Volume": "sum",
+                "Gross Margin %": "mean"
+            }).reset_index()
+    
+            # ------------------------------------------------
+            # 1️⃣ MARGIN WATERFALL
+            # ------------------------------------------------
+            st.markdown("### Margin Waterfall")
+    
+            total_revenue = filtered_data["Revenue"].sum()
+            total_cogs = filtered_data["COGS"].sum()
+            total_trade = filtered_data["Trade Spend"].sum()
+            net_margin = total_revenue - total_cogs - total_trade
+    
+            waterfall = go.Figure(go.Waterfall(
+                measure=["absolute", "relative", "relative", "total"],
+                x=["Gross Revenue", "COGS", "Trade Spend", "Net Margin"],
+                y=[total_revenue, -total_cogs, -total_trade, net_margin],
+                connector={"line": {"color": "gray"}},
+            ))
+    
+            waterfall.update_layout(title="Revenue to Net Margin Breakdown")
+    
+            st.plotly_chart(waterfall, use_container_width=True)
+    
+            # ------------------------------------------------
+            # 2️⃣ DRIVERS & DRAGGERS
+            # ------------------------------------------------
+            st.markdown("### Drivers & Draggers")
+    
+            fig = px.scatter(
+                profit_summary,
+                x="Volume",
+                y="Gross Margin %",
+                size="Revenue",
+                color="Gross Margin %",
+                text="Product",
+                title="Sales Volume vs Gross Margin %",
+                color_continuous_scale="RdYlGn"
+            )
+    
+            fig.update_traces(textposition="top center")
+    
+            st.plotly_chart(fig, use_container_width=True)
+    
+            st.caption("""
+            • Top Right = High Volume + High Margin (Profit Drivers)  
+            • Bottom Right = High Volume + Low Margin (Margin Draggers)  
+            """)
+    
+            # ------------------------------------------------
+            # 3️⃣ TRADE ROI CALCULATOR
+            # ------------------------------------------------
+            st.markdown("### Trade ROI Calculator")
+    
+            trade_summary = filtered_data.groupby(
+                ["Retailer", "Product"]
+            ).agg({
+                "Trade Spend": "sum",
+                "Revenue": "sum"
+            }).reset_index()
+    
+            # Simulate Incremental Lift
+            trade_summary["Incremental Lift"] = trade_summary["Revenue"] * 0.15
+    
+            trade_summary["ROI"] = (
+                trade_summary["Incremental Lift"] /
+                trade_summary["Trade Spend"]
+            ).round(2)
+    
+            st.dataframe(trade_summary.sort_values("ROI", ascending=False),
+                         use_container_width=True)
+    
+            # Highlight risk
+            low_roi = trade_summary[trade_summary["ROI"] < 1]
+    
+            if not low_roi.empty:
+                st.warning("⚠ Trade events below 1.0 ROI detected — review spend efficiency.")
+            else:
+                st.success("All trade events generating positive ROI.")
 # ====================================================
 # MODULE 3: TPO SIMULATOR
 # ====================================================
