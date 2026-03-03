@@ -52,18 +52,29 @@ data["Gross Margin %"] = ((data["Revenue"] - data["COGS"]) / data["Revenue"]) * 
 # ----------------------------------------------------
 st.sidebar.title("Reynolds CPG Toolkit")
 
+# ----------------------------------------------------
+# MODULE NAVIGATION
+# ----------------------------------------------------
+module = st.sidebar.radio("Navigation", [
+    "Data Management Portal",
+    "Power BI Dashboard",
+    "TPO Simulator",
+    "Gen AI NL Assistant"
+])
+
+
 st.sidebar.markdown("## Global Filters")
 
 selected_retailer = st.sidebar.multiselect(
-    "Retailer", retailers, default=retailers
+    "Retailer", retailers, default=[retailers[0]]
 )
 
 selected_region = st.sidebar.multiselect(
-    "Region", regions, default=regions
+    "Region", regions, default=[regions[0]]
 )
 
 selected_product = st.sidebar.multiselect(
-    "Product", products, default=products
+    "Product", products, default=[products[0]]
 )
 
 date_range = st.sidebar.date_input(
@@ -80,15 +91,6 @@ filtered_data = data[
     (data["Date"] <= pd.to_datetime(date_range[1]))
 ]
 
-# ----------------------------------------------------
-# MODULE NAVIGATION
-# ----------------------------------------------------
-module = st.sidebar.radio("Navigation", [
-    "Data Management Portal",
-    "Power BI Dashboard",
-    "TPO Simulator",
-    "Gen AI NL Assistant"
-])
 
 # ====================================================
 # MODULE 1: DATA MANAGEMENT
@@ -108,62 +110,13 @@ if module == "Data Management Portal":
 
     st.dataframe(sku_map, use_container_width=True)
 
-    # ------------------------------------------------
-    # DATA QUALITY SCORECARD (FILTERED)
-    # ------------------------------------------------
-    st.subheader("Enterprise Data Quality Scorecard")
+    st.subheader("Data Quality Scorecard")
 
-    # Simulated source splits
-    nielsen_pos = filtered_data.sample(frac=0.95, random_state=1)
-    internal_ship = filtered_data.sample(frac=1.0, random_state=2)
-    trade_planner = filtered_data.sample(frac=0.85, random_state=3)
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Data Freshness", "97%")
+    col2.metric("Accuracy", "99%")
+    col3.metric("Completeness", "91%")
 
-    # Freshness (based on max date proximity)
-    today = filtered_data["Date"].max()
-    freshness_score = lambda df: round(
-        100 - ((datetime.today() - df["Date"].max()).days * 2), 1
-    )
-
-    # Completeness (null check simulation)
-    completeness_score = lambda df: round(
-        (df.notnull().mean().mean()) * 100, 1
-    )
-
-    # Accuracy (simulated variance control)
-    accuracy_score = lambda df: round(
-        100 - (np.std(df["Revenue"]) / np.mean(df["Revenue"]) * 10), 1
-    )
-
-    sources = {
-        "Nielsen POS": nielsen_pos,
-        "Internal Shipments": internal_ship,
-        "Trade Planner": trade_planner
-    }
-
-    cols = st.columns(3)
-
-    for i, (source, df_source) in enumerate(sources.items()):
-        with cols[i]:
-            fresh = freshness_score(df_source)
-            complete = completeness_score(df_source)
-            accuracy = accuracy_score(df_source)
-
-            st.markdown(f"### {source}")
-            st.metric("Freshness %", f"{fresh}%")
-            st.metric("Completeness %", f"{complete}%")
-            st.metric("Accuracy %", f"{accuracy}%")
-
-    # Overall Governance Index
-    overall_index = round(
-        np.mean([
-            freshness_score(nielsen_pos),
-            completeness_score(internal_ship),
-            accuracy_score(trade_planner)
-        ]), 1
-    )
-
-    st.markdown("---")
-    st.success(f"Overall Enterprise Data Governance Index: {overall_index}%")
 # ====================================================
 # MODULE 2: POWER BI DASHBOARD
 # ====================================================
